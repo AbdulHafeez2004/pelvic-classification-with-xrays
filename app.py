@@ -1,24 +1,24 @@
-from flask import Flask, request, render_template, redirect, url_for, flash, send_from_directory, send_file
+from flask import Flask, request, render_template, redirect, url_for, flash, send_from_directory
 import os
 from werkzeug.utils import secure_filename
 import joblib
 import numpy as np
 from datetime import datetime
 
-from utils.preprocessing import preprocess_single_image, extract_single_image_features
+from utils.preprocessing import preprocess_single_image, extract_single_image_features, validate_pelvic_xray
 
 # Initialize Flask app
 app = Flask(__name__)
-app.secret_key = 'your-secret-key-here'  # Change this in production
+app.secret_key = 'your-secret-key-here'
 
 # Configuration
 app.config['UPLOAD_FOLDER'] = 'uploads'
-app.config['MAX_CONTENT_LENGTH'] = 16 * 1024 * 1024  # 16MB max file size
+app.config['MAX_CONTENT_LENGTH'] = 16 * 1024 * 1024
 app.config['ALLOWED_EXTENSIONS'] = {'png', 'jpg', 'jpeg', 'jfif'}
 
 # Create necessary directories
 os.makedirs(app.config['UPLOAD_FOLDER'], exist_ok=True)
-os.makedirs('static/css', exist_ok=True)
+os.makedirs('static', exist_ok=True)
 
 # Global variables for loaded model
 model = None
@@ -46,19 +46,18 @@ def allowed_file(filename):
 
 @app.route('/')
 def index():
-    """Main page"""
     return render_template('index.html', model_loaded=model is not None)
 
 @app.route('/predict', methods=['POST'])
 def predict():
-    """Handle image upload and prediction"""
+    """Handle image upload and prediction with strict pelvic X-ray validation"""
     if 'file' not in request.files:
-        flash('No file uploaded', 'error')
+        flash('No file uploaded. Please select a pelvic X-ray image to analyze.', 'error')
         return redirect(url_for('index'))
     
     file = request.files['file']
     if file.filename == '':
-        flash('No file selected', 'error')
+        flash('No file selected. Please choose a pelvic X-ray image.', 'error')
         return redirect(url_for('index'))
     
     if file and allowed_file(file.filename):
@@ -69,6 +68,14 @@ def predict():
             unique_filename = f"{timestamp}_{filename}"
             filepath = os.path.join(app.config['UPLOAD_FOLDER'], unique_filename)
             file.save(filepath)
+            
+            # Strict validation for pelvic X-rays
+            is_valid_pelvic_xray, validation_message = validate_pelvic_xray(filepath)
+            
+            if not is_valid_pelvic_xray:
+                os.remove(filepath)
+                flash(validation_message, 'error')
+                return redirect(url_for('index'))
             
             # Check if model is loaded
             if model is None or label_encoder is None:
@@ -81,7 +88,7 @@ def predict():
             img = preprocess_single_image(filepath)
             if img is None:
                 os.remove(filepath)
-                flash('Could not process image. Please upload a valid image file.', 'error')
+                flash('Could not process image. Please upload a valid pelvic X-ray image.', 'error')
                 return redirect(url_for('index'))
             
             # Extract features and predict
@@ -95,9 +102,9 @@ def predict():
             prediction_data = {
                 'gender': gender,
                 'confidence': confidence,
-                'confidence_percentage': f"{confidence * 100:.2f}%",
-                'confidence_width': confidence * 100 
+                'confidence_percentage': f"{confidence * 100:.2f}%"
             }
+            
             
             return render_template('results.html',
                                  prediction=prediction_data,
@@ -112,7 +119,7 @@ def predict():
             flash(f'Prediction failed: {str(e)}', 'error')
             return redirect(url_for('index'))
     
-    flash('Invalid file type. Please upload PNG, JPG, or JPEG images.', 'error')
+    flash('Invalid file type. Please upload PNG, JPG, or JPEG pelvic X-ray images only.', 'error')
     return redirect(url_for('index'))
 
 @app.route('/uploads/<filename>')
@@ -122,18 +129,31 @@ def uploaded_file(filename):
 
 @app.route('/confusion-matrix')
 def confusion_matrix():
-    """Serve confusion matrix image"""
+    """Serve confusion matrix image from root directory"""
     try:
-        return send_file('confusion_matrix.png')
-    except:
+        # Check if file exists in current directory
+        if not os.path.isfile('confusion_matrix.png'):
+            return render_template('error.html',
+                                 error_title="Confusion Matrix Not Available",
+                                 error_message="Please train the model first to generate the performance metrics.",
+                                 model_loaded=model is not None)
+        
+        # Serve the file from current working directory
+        return send_from_directory(os.getcwd(), 'confusion_matrix.png')
+        
+    except Exception as e:
+        print(f"Error in confusion matrix route: {e}")
         return render_template('error.html',
-                             error_title="Confusion Matrix Not Available",
-                             error_message="The confusion matrix image is not available.",
+                             error_title="Error Loading Performance Metrics",
+                             error_message="There was an error loading the model performance data.",
                              model_loaded=model is not None)
-    
+
 @app.route('/model-status')
 def model_status():
     """Check if model is loaded"""
+    if model is not None and label_encoder is None:
+        load_model()
+        
     if model is not None and label_encoder is not None:
         return {
             'status': 'loaded',
@@ -141,22 +161,15 @@ def model_status():
             'accuracy': f"{model_accuracy:.2f}%"
         }
     else:
-        if load_model():
-            return {
-                'status': 'loaded',
-                'classes': label_encoder.classes_.tolist(),
-                'accuracy': f"{model_accuracy:.2f}%"
-            }
-        else:
-            return {'status': 'not_loaded'}
-            
+        return {'status': 'not_loaded'}
+
 @app.errorhandler(413)
 def too_large(e):
     """Handle file too large error"""
     return render_template('error.html',
                          error_title="File Too Large",
-                         error_message="The file you uploaded is too large.",
-                         error_details="Maximum file size is 16MB.",
+                         error_message="The pelvic X-ray image you uploaded is too large.",
+                         error_details="Maximum file size is 16MB. Please upload a smaller image.",
                          model_loaded=model is not None), 413
 
 @app.errorhandler(404)
@@ -172,7 +185,7 @@ def internal_error(e):
     """Handle 500 errors"""
     return render_template('error.html',
                          error_title="Internal Server Error",
-                         error_message="Something went wrong on our end.",
+                         error_message="Something went wrong on our end. Please try again.",
                          model_loaded=model is not None), 500
 
 # Load model when app starts

@@ -319,13 +319,13 @@
 </style>
 
 <div class="upload-section">
-    <h2>Upload X-ray Image</h2>
+    <h2>Upload Pelvic X-ray Image</h2>
 
     {% with messages = get_flashed_messages(with_categories=true) %}
     {% if messages %}
     {% for category, message in messages %}
     <div class="alert alert-{{ category }}">
-        <span>{{ message }}</span>
+        {{ message }}
     </div>
     {% endfor %}
     {% endif %}
@@ -333,16 +333,15 @@
 
     <form action="{{ url_for('predict') }}" method="post" enctype="multipart/form-data" class="upload-form">
         <div class="form-group">
-            <label for="file" class="file-label">Select X-ray Image:</label>
-            <div class="file-input-wrapper">
-                <input type="file" id="file" name="file" accept=".png,.jpg,.jpeg" required>
-            </div>
+            <label for="file" class="file-label">Select Pelvic X-ray Image:</label>
+            <input type="file" id="file" name="file" accept=".png,.jpg,.jpeg" required>
             <div class="file-types">Supported formats: PNG, JPG, JPEG</div>
+            <div class="file-types">Please supply only pelvic images, as non-pelvic images would be rejected.</div>
         </div>
 
         <div class="form-group">
             <button type="submit" class="submit-btn">
-                🔍 Predict Gender
+                Analyze X-ray Image
             </button>
         </div>
     </form>
@@ -350,11 +349,26 @@
     <div class="instructions">
         <h3>How to use:</h3>
         <ol>
-            <li>Click "Choose File" to select a pelvic X-ray image from your device</li>
-            <li>Ensure the image is clear and shows the pelvic bone structure</li>
-            <li>Click "Predict Gender" to analyze the image using our AI model</li>
-            <li>View the detailed results and confidence metrics on the next page</li>
+            <li>Click "Choose File" to select a pelvic X-ray image</li>
+            <li>Click "Analyze X-ray Image" to process the image</li>
+            <li>View the gender prediction results on the next page</li>
         </ol>
+
+        <div class="requirements">
+            <h3>Image Requirements:</h3>
+            <ul>
+                <li>Must be a pelvic X-ray image</li>
+                <li>Minimum dimensions: 256x256 pixels</li>
+                <li>Minimum file size: 20KB</li>
+                <li>Formats: PNG, JPG, or JPEG</li>
+                <li>Maximum file size: 16MB</li>
+            </ul>
+        </div>
+
+        <div class="note">
+            <strong>Note:</strong> The system will automatically reject non-X-ray images,
+            low-resolution images, and files that don't meet the requirements above.
+        </div>
     </div>
 </div>
 {% endblock %}

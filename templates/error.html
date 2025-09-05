@@ -1,9 +1,8 @@
 {% extends "layout.html" %}
 
-{% block title %}
-Error - Pelvic X-ray Gender Classification
-{% endblock %}
+{% block title %}Error - Pelvic X-ray Gender Classification{% endblock %}
 
+{% block content %}
 <style>
     /* ===== ERROR SECTION STYLES ===== */
     .error-section {
@@ -151,7 +150,6 @@ Error - Pelvic X-ray Gender Classification
     }
 </style>
 
-{% block content %}
 <div class="error-section">
     <h2>Error</h2>
 
@@ -168,16 +166,17 @@ Error - Pelvic X-ray Gender Classification
     </div>
 
     <div class="actions">
-        <a href="{{ url_for('index') }}" class="btn btn-primary">Try Again</a>
+        <a href="{{ url_for('index') }}" class="btn btn-primary">Upload Another Image</a>
     </div>
 
     <div class="troubleshooting">
         <h3>Troubleshooting Tips:</h3>
         <ul>
-            <li>Ensure you're uploading a valid image file (PNG, JPG, JPEG)</li>
-            <li>Check that the file is a pelvic X-ray image</li>
-            <li>Make sure the file size is reasonable (under 16MB)</li>
-            <li>Verify that the model is properly loaded</li>
+            <li>Ensure you're uploading a valid pelvic X-ray image</li>
+            <li>Check that the image meets the size and format requirements</li>
+            <li>Make sure the file size is under 16MB</li>
+            <li>Try using a different X-ray image if the issue persists</li>
+            <li>Verify that the model is properly loaded (check status above)</li>
         </ul>
     </div>
 </div>
